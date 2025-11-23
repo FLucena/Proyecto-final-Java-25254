@@ -22,7 +22,8 @@ API REST desarrollada con Spring Boot para gestionar partidos de fútbol. Permit
 
 - ✅ **Gestión de Partidos**: Crear, editar, eliminar y buscar partidos
 - ✅ **Gestión de Sedes**: Crear y administrar sedes (lugares donde se juegan los partidos)
-- ✅ **Sistema de Partidos Seleccionados**: Agregar partidos a una lista temporal antes de confirmar
+- ✅ **Sistema de Partidos Seleccionados**: Agregar partidos a una lista temporal antes de confirmar (carrito para reservas)
+- ✅ **Sistema de Partidos Guardados**: Guardar partidos favoritos para inscribirse después
 - ✅ **Sistema de Reservas**: Confirmar múltiples reservas a partidos a la vez
 - ✅ **Búsqueda Avanzada**: Filtrar partidos por múltiples criterios
 - ✅ **Gestión de Participantes**: Inscribirse y desinscribirse de partidos
@@ -84,6 +85,7 @@ src/main/java/com/techlab/picadito/
 │   ├── PartidoController.java
 │   ├── ParticipanteController.java
 │   ├── PartidosSeleccionadosController.java
+│   ├── PartidosGuardadosController.java
 │   ├── ReservaController.java
 │   ├── SedeController.java
 │   └── AdminController.java
@@ -91,20 +93,26 @@ src/main/java/com/techlab/picadito/
 │   ├── PartidoService.java
 │   ├── ParticipanteService.java
 │   ├── PartidosSeleccionadosService.java
+│   ├── PartidosGuardadosService.java
 │   ├── ReservaService.java
-│   └── SedeService.java
+│   ├── SedeService.java
+│   └── UsuarioService.java
 ├── repository/          # Acceso a datos (JPA)
 │   ├── PartidoRepository.java
 │   ├── ParticipanteRepository.java
 │   ├── PartidosSeleccionadosRepository.java
+│   ├── PartidosGuardadosRepository.java
 │   ├── ReservaRepository.java
-│   └── SedeRepository.java
+│   ├── SedeRepository.java
+│   └── UsuarioRepository.java
 ├── model/               # Entidades JPA
 │   ├── Partido.java
 │   ├── Participante.java
 │   ├── PartidosSeleccionados.java
+│   ├── PartidosGuardados.java
 │   ├── Reserva.java
-│   └── Sede.java
+│   ├── Sede.java
+│   └── Usuario.java
 ├── dto/                 # Objetos de transferencia
 │   ├── PartidoDTO.java
 │   ├── BusquedaPartidoDTO.java
@@ -179,6 +187,13 @@ El proyecto sigue una **arquitectura en capas** (Layered Architecture) con separ
 - `PUT /api/partidos-seleccionados/usuario/{usuarioId}/item/{lineaId}` - Actualizar cantidad
 - `DELETE /api/partidos-seleccionados/usuario/{usuarioId}/item/{lineaId}` - Eliminar item
 - `DELETE /api/partidos-seleccionados/usuario/{usuarioId}` - Vaciar selección
+
+### Partidos Guardados
+
+- `GET /api/partidos-guardados/usuario/{usuarioId}` - Obtener partidos guardados
+- `POST /api/partidos-guardados/usuario/{usuarioId}/agregar` - Agregar partido a favoritos
+- `DELETE /api/partidos-guardados/usuario/{usuarioId}/partido/{lineaPartidoGuardadoId}` - Eliminar partido
+- `DELETE /api/partidos-guardados/usuario/{usuarioId}` - Vaciar partidos guardados
 
 ### Reservas
 
@@ -258,10 +273,20 @@ El proyecto sigue una **arquitectura en capas** (Layered Architecture) con separ
 - No puede haber dos participantes con el mismo nombre en el mismo partido
 - El apodo, la posición preferida y el nivel son completamente opcionales
 
-### Partidos Seleccionados y Reservas
+### Partidos Seleccionados
 - Al agregar partidos a la selección, se valida que el partido esté disponible y tenga cupos
+- Permite especificar cantidad de jugadores por partido
+- Permite agregar el mismo partido varias veces (suma cantidades)
+- Se puede actualizar la cantidad de cada partido
+
+### Partidos Guardados
+- Al agregar partidos guardados, se valida que el partido esté disponible y tenga cupos
+- No permite duplicados (cada partido solo puede estar una vez en la lista)
+- Cantidad fija (siempre 1 por partido)
+- Funciona como lista de favoritos para inscribirse después
+
+### Reservas
 - Al confirmar reservas, se valida que todos los partidos sigan disponibles
-- **Validación importante**: Solo se pueden confirmar partidos que estén completos (cantidadParticipantes === maxJugadores)
 - Se verifica que haya cupos disponibles en todos los partidos
 - Se crean los participantes automáticamente al confirmar la reserva
 - Los partidos se marcan como COMPLETO si se llenan
