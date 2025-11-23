@@ -30,7 +30,6 @@ API REST desarrollada con Spring Boot para gestionar partidos de fútbol. Permit
 - ✅ **Validaciones de Negocio**: Estado del partido, capacidad máxima, fechas futuras, validación de partidos completos
 - ✅ **Manejo Centralizado de Excepciones**: Errores consistentes y claros
 - ✅ **Bloqueo Optimista**: Previene race conditions en inscripciones
-- ✅ **Documentación Swagger**: API documentada automáticamente
 
 ## 🔧 Tecnologías Utilizadas
 
@@ -39,7 +38,6 @@ API REST desarrollada con Spring Boot para gestionar partidos de fútbol. Permit
 - **Hibernate** - ORM para mapeo objeto-relacional
 - **H2 Database** - Base de datos en memoria para desarrollo
 - **Lombok** - Reducción de boilerplate code
-- **Swagger/OpenAPI** - Documentación automática de la API
 - **Java 21** - Lenguaje de programación
 - **Maven** - Gestión de dependencias y build
 
@@ -73,7 +71,6 @@ mvn spring-boot:run
 
 - Espera a ver el mensaje: `Started PicaditoApplication`
 - El backend estará disponible en: `http://localhost:8080`
-- **Swagger UI**: `http://localhost:8080/swagger-ui.html`
 - **H2 Console**: `http://localhost:8080/h2-console`
   - JDBC URL: `jdbc:h2:mem:testdb`
   - Usuario: `sa`
@@ -117,7 +114,6 @@ src/main/java/com/techlab/picadito/
 │   └── ...
 ├── config/              # Configuraciones
 │   ├── CorsConfig.java
-│   ├── SwaggerConfig.java
 │   └── DataInitializer.java
 └── util/                # Utilidades
     └── MapperUtil.java
@@ -337,7 +333,6 @@ Ejemplo de respuesta de error:
 - ✅ Bloqueo optimista para prevenir race conditions
 - ✅ Separación de responsabilidades
 - ✅ Código limpio y mantenible
-- ✅ Documentación con Swagger
 - ✅ Manejo de errores consistente
 
 ## 🧪 Testing
@@ -388,11 +383,6 @@ Configurado para permitir orígenes específicos:
   - Password: (vacío)
 
 **⚠️ Nota**: Los datos se pierden al reiniciar la aplicación. Para producción, configurar una base de datos persistente (PostgreSQL, MySQL, etc.)
-
-### Swagger/OpenAPI
-- **Swagger UI**: `http://localhost:8080/swagger-ui.html`
-- Documentación automática de todos los endpoints
-- Interfaz interactiva para probar la API
 
 ## 📝 Datos de Prueba
 
