@@ -36,6 +36,8 @@ public class PartidoDTO {
     @Size(max = 500, message = "La URL de la imagen no puede exceder 500 caracteres")
     private String imagenUrl;
 
+    private Long categoriaId;
+
     // Getters y Setters
     public String getTitulo() {
         return titulo;
@@ -107,6 +109,14 @@ public class PartidoDTO {
 
     public void setImagenUrl(String imagenUrl) {
         this.imagenUrl = imagenUrl;
+    }
+
+    public Long getCategoriaId() {
+        return categoriaId;
+    }
+
+    public void setCategoriaId(Long categoriaId) {
+        this.categoriaId = categoriaId;
     }
 }
 

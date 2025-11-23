@@ -35,6 +35,10 @@ public class Partido {
     @JoinColumn(name = "sede_id", nullable = true)
     private Sede sede;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "categoria_id", nullable = true)
+    private Categoria categoria;
+
     @NotNull(message = "El número máximo de jugadores es requerido")
     @Min(value = 1, message = "El número máximo de jugadores debe ser al menos 1")
     @Max(value = 50, message = "El número máximo de jugadores no puede exceder 50")
@@ -65,6 +69,9 @@ public class Partido {
 
     @OneToMany(mappedBy = "partido", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Participante> participantes = new ArrayList<>();
+
+    @OneToMany(mappedBy = "partido", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Equipo> equipos = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {
@@ -194,6 +201,22 @@ public class Partido {
 
     public void setImagenUrl(String imagenUrl) {
         this.imagenUrl = imagenUrl;
+    }
+
+    public Categoria getCategoria() {
+        return categoria;
+    }
+
+    public void setCategoria(Categoria categoria) {
+        this.categoria = categoria;
+    }
+
+    public List<Equipo> getEquipos() {
+        return equipos;
+    }
+
+    public void setEquipos(List<Equipo> equipos) {
+        this.equipos = equipos;
     }
 }
 

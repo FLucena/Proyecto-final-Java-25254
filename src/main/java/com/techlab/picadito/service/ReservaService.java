@@ -28,6 +28,7 @@ public class ReservaService {
     private final PartidosSeleccionadosService partidosSeleccionadosService;
     private final ParticipanteService participanteService;
     private final MapperUtil mapperUtil;
+    private final AlertaService alertaService;
     
     private static final Map<Reserva.EstadoReserva, Set<Reserva.EstadoReserva>> TRANSICIONES_VALIDAS = new HashMap<>();
     
@@ -77,6 +78,11 @@ public class ReservaService {
         // Confirmar la reserva
         reserva.setEstado(Reserva.EstadoReserva.CONFIRMADO);
         reserva = reservaRepository.save(reserva);
+        
+        // Generar alertas de confirmación para cada partido
+        for (LineaReserva linea : reserva.getLineasReserva()) {
+            alertaService.crearAlertaReservaConfirmada(usuarioId, linea.getPartido().getTitulo());
+        }
         
         // Actualizar estado automáticamente si algún partido está próximo
         actualizarEstadoAutomatico(reserva);

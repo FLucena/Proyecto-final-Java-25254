@@ -21,5 +21,6 @@ public class BusquedaPartidoDTO {
     private Integer maxJugadores;
     private Integer cuposDisponiblesMin;
     private Boolean soloDisponibles;
+    private Long categoriaId;
 }
 

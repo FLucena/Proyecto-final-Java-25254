@@ -31,6 +31,11 @@ API REST desarrollada con Spring Boot para gestionar partidos de fútbol. Permit
 - ✅ **Validaciones de Negocio**: Estado del partido, capacidad máxima, fechas futuras, validación de partidos completos
 - ✅ **Manejo Centralizado de Excepciones**: Errores consistentes y claros
 - ✅ **Bloqueo Optimista**: Previene race conditions en inscripciones
+- ✅ **Sistema de Categorías**: Clasificar partidos por categorías (Fútbol 11, Fútbol 7, Mixto, etc.)
+- ✅ **Sistema de Alertas/Notificaciones**: Alertas automáticas para cupos bajos, partidos próximos y confirmaciones
+- ✅ **Sistema de Estadísticas y Reportes**: Dashboard administrativo con métricas y reportes detallados
+- ✅ **Sistema de Calificaciones**: Los usuarios pueden calificar partidos después de jugarlos
+- ✅ **Sistema de Equipos Automáticos**: Generación automática de equipos balanceados por posición y nivel
 
 ## 🔧 Tecnologías Utilizadas
 
@@ -179,6 +184,50 @@ El proyecto sigue una **arquitectura en capas** (Layered Architecture) con separ
 - `PUT /api/partidos/{id}` - Actualizar partido
 - `DELETE /api/partidos/{id}` - Eliminar partido
 - `GET /api/partidos/{id}/costo-por-jugador` - Obtener costo por jugador
+- `GET /api/partidos/categoria/{categoriaId}` - Obtener partidos por categoría
+
+### Categorías
+
+- `GET /api/categorias` - Listar todas las categorías
+- `GET /api/categorias/{id}` - Obtener categoría por ID
+- `POST /api/categorias` - Crear nueva categoría
+- `PUT /api/categorias/{id}` - Actualizar categoría
+- `DELETE /api/categorias/{id}` - Eliminar categoría
+
+### Alertas
+
+- `GET /api/alertas/usuario/{usuarioId}` - Obtener alertas de un usuario
+- `GET /api/alertas/usuario/{usuarioId}/no-leidas` - Obtener alertas no leídas
+- `POST /api/alertas` - Crear nueva alerta
+- `PUT /api/alertas/{id}/marcar-leida` - Marcar alerta como leída
+- `PUT /api/alertas/usuario/{usuarioId}/marcar-todas-leidas` - Marcar todas como leídas
+- `DELETE /api/alertas/{id}` - Eliminar alerta
+
+### Estadísticas y Reportes (Admin)
+
+- `GET /api/admin/estadisticas` - Obtener estadísticas generales
+- `GET /api/admin/estadisticas/periodo` - Obtener estadísticas por período
+- `GET /api/admin/reportes/ventas` - Generar reporte de ventas
+- `GET /api/admin/reportes/partidos` - Generar reporte de partidos
+- `GET /api/admin/reportes/usuarios` - Generar reporte de usuarios
+- `GET /api/admin/partidos-capacidad-baja` - Obtener partidos con capacidad baja
+
+### Calificaciones
+
+- `POST /api/calificaciones/usuario/{usuarioId}` - Crear calificación
+- `GET /api/calificaciones/partido/{partidoId}` - Obtener calificaciones de un partido
+- `GET /api/calificaciones/partido/{partidoId}/promedio` - Obtener promedio de calificaciones
+- `GET /api/calificaciones/creador/{creadorNombre}/promedio` - Obtener promedio por creador
+- `GET /api/calificaciones/sede/{sedeId}/promedio` - Obtener promedio por sede
+- `GET /api/calificaciones/{id}` - Obtener calificación por ID
+- `DELETE /api/calificaciones/{id}` - Eliminar calificación
+
+### Equipos
+
+- `POST /api/equipos/partido/{partidoId}/generar` - Generar equipos automáticos
+- `GET /api/equipos/partido/{partidoId}` - Obtener equipos de un partido
+- `GET /api/equipos/{id}` - Obtener equipo por ID
+- `DELETE /api/equipos/partido/{partidoId}` - Eliminar equipos de un partido
 
 ### Partidos Seleccionados
 
@@ -237,6 +286,10 @@ El proyecto sigue una **arquitectura en capas** (Layered Architecture) con separ
 - `cantidadParticipantes`: Cantidad actual de participantes
 - `precio`: Precio total del partido (opcional)
 - `imagenUrl`: URL de imagen del partido (opcional, máx. 500 caracteres)
+- `categoriaId`: ID de la categoría del partido (opcional)
+- `categoria`: Objeto Categoria completo (incluido en respuesta)
+- `promedioCalificacion`: Promedio de calificaciones del partido (opcional)
+- `equipos`: Lista de equipos generados para el partido (opcional)
 
 ### Sede
 - `id`: Identificador único (auto-generado)
@@ -256,6 +309,45 @@ El proyecto sigue una **arquitectura en capas** (Layered Architecture) con separ
 - `nivel`: Nivel de juego (PRINCIPIANTE, INTERMEDIO, AVANZADO, EXPERTO, opcional)
 - `fechaInscripcion`: Fecha de inscripción (auto-generada)
 - `partido`: Relación con el partido
+
+### Categoria
+
+- `id`: Identificador único (auto-generado)
+- `nombre`: Nombre de la categoría (máx. 100 caracteres, requerido, único)
+- `descripcion`: Descripción opcional (máx. 500 caracteres)
+- `icono`: Icono de la categoría (máx. 50 caracteres, opcional)
+- `color`: Color de la categoría (máx. 20 caracteres, opcional)
+- `fechaCreacion`: Fecha de creación (auto-generada)
+- `fechaActualizacion`: Fecha de última actualización (auto-generada)
+
+### Alerta
+
+- `id`: Identificador único (auto-generado)
+- `tipo`: Tipo de alerta (CUPOS_BAJOS, PARTIDO_PROXIMO, PARTIDO_CANCELADO, RESERVA_CONFIRMADA, PARTIDO_COMPLETO)
+- `mensaje`: Mensaje de la alerta (requerido)
+- `leida`: Indica si la alerta ha sido leída (default: false)
+- `usuario`: Usuario al que pertenece la alerta (opcional)
+- `partido`: Partido relacionado (opcional)
+- `fechaCreacion`: Fecha de creación (auto-generada)
+
+### Calificacion
+
+- `id`: Identificador único (auto-generado)
+- `puntuacion`: Puntuación de 1 a 5 (requerido)
+- `comentario`: Comentario opcional (máx. 1000 caracteres)
+- `usuario`: Usuario que califica (requerido)
+- `partido`: Partido calificado (requerido)
+- `fechaCreacion`: Fecha de creación (auto-generada)
+- **Restricción**: Un usuario solo puede calificar un partido una vez
+- **Validación**: Solo se pueden calificar partidos finalizados
+
+### Equipo
+
+- `id`: Identificador único (auto-generado)
+- `nombre`: Nombre del equipo (máx. 100 caracteres, requerido)
+- `partido`: Partido al que pertenece (requerido)
+- `participantes`: Lista de participantes del equipo
+- `cantidadParticipantes`: Cantidad de participantes (calculado)
 
 ## ⚠️ Validaciones y Reglas de Negocio
 
@@ -304,6 +396,36 @@ El proyecto sigue una **arquitectura en capas** (Layered Architecture) con separ
 - Los partidos pueden estar asociados a una sede mediante `sedeId`
 - La migración automática crea sedes únicas basadas en las ubicaciones existentes de los partidos
 - No se puede eliminar una sede si hay partidos asociados (validación de integridad referencial)
+
+### Categorías
+- Las categorías permiten clasificar partidos (Fútbol 11, Fútbol 7, Mixto, etc.)
+- Cada categoría puede tener nombre, descripción, icono y color
+- Los partidos pueden estar asociados a una categoría mediante `categoriaId`
+- Se pueden filtrar partidos por categoría en la búsqueda avanzada
+
+### Alertas
+- Las alertas se generan automáticamente cuando:
+  - Un partido tiene pocos cupos disponibles (≤ 5)
+  - Un partido está próximo a jugarse (24-48 horas antes)
+  - Una reserva es confirmada
+- Las alertas se pueden marcar como leídas individualmente o todas a la vez
+- Un job programado verifica partidos próximos cada hora
+- Las alertas antiguas (más de 30 días) se eliminan automáticamente
+
+### Calificaciones
+- Los usuarios pueden calificar partidos después de que finalicen
+- La calificación es de 1 a 5 estrellas
+- Se puede incluir un comentario opcional
+- Un usuario solo puede calificar un partido una vez
+- Se calculan promedios por partido, creador y sede
+
+### Equipos
+- Los equipos se generan automáticamente dividiendo los participantes en 2 equipos balanceados
+- El algoritmo considera:
+  - Posiciones preferidas (portero, defensa, mediocampo, delantera)
+  - Niveles de juego (principiante, intermedio, avanzado, experto)
+- Los equipos se balancean para que tengan similar cantidad de participantes y distribución de niveles
+- Se pueden regenerar los equipos en cualquier momento
 
 ## 🛡️ Manejo de Errores
 

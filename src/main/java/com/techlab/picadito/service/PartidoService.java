@@ -1,6 +1,8 @@
 package com.techlab.picadito.service;
 
 import com.techlab.picadito.dto.BusquedaPartidoDTO;
+import com.techlab.picadito.dto.CategoriaResponseDTO;
+import com.techlab.picadito.dto.EquipoResponseDTO;
 import com.techlab.picadito.dto.PartidoDTO;
 import com.techlab.picadito.dto.PartidoResponseDTO;
 import com.techlab.picadito.dto.ParticipanteResponseDTO;
@@ -8,6 +10,7 @@ import com.techlab.picadito.dto.SedeResponseDTO;
 import com.techlab.picadito.exception.BusinessException;
 import com.techlab.picadito.exception.ResourceNotFoundException;
 import com.techlab.picadito.exception.ValidationException;
+import com.techlab.picadito.model.Categoria;
 import com.techlab.picadito.model.EstadoPartido;
 import com.techlab.picadito.model.Partido;
 import com.techlab.picadito.model.Participante;
@@ -18,6 +21,7 @@ import jakarta.persistence.criteria.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
@@ -39,6 +43,21 @@ public class PartidoService {
 
     @Autowired
     private SedeRepository sedeRepository;
+
+    @Autowired
+    private CategoriaService categoriaService;
+
+    @Autowired
+    @Lazy
+    private AlertaService alertaService;
+
+    @Autowired
+    @Lazy
+    private CalificacionService calificacionService;
+
+    @Autowired
+    @Lazy
+    private EquipoService equipoService;
 
     public List<PartidoResponseDTO> obtenerTodosLosPartidos() {
         return partidoRepository.findAll().stream()
@@ -67,8 +86,13 @@ public class PartidoService {
 
         Partido partido = crearEntidadPartido(partidoDTO);
         asignarSedeSiExiste(partido, partidoDTO.getSedeId());
+        asignarCategoriaSiExiste(partido, partidoDTO.getCategoriaId());
 
         partido = partidoRepository.save(partido);
+        
+        // Generar alerta si hay cupos bajos
+        alertaService.crearAlertaCuposBajos(partido);
+        
         logger.info("Partido creado exitosamente con id: {}", partido.getId());
         return convertirADTO(partido);
     }
@@ -95,6 +119,13 @@ public class PartidoService {
         }
     }
 
+    private void asignarCategoriaSiExiste(Partido partido, Long categoriaId) {
+        if (categoriaId != null) {
+            Categoria categoria = categoriaService.obtenerCategoriaEntity(categoriaId);
+            partido.setCategoria(categoria);
+        }
+    }
+
     @SuppressWarnings("null")
     public PartidoResponseDTO actualizarPartido(@NonNull Long id, PartidoDTO partidoDTO) {
         logger.info("Actualizando partido con id: {}", id);
@@ -106,6 +137,10 @@ public class PartidoService {
 
         partido = partidoRepository.save(partido);
         actualizarEstadoSegunParticipantes(partido);
+        
+        // Generar alerta si hay cupos bajos después de actualizar
+        alertaService.crearAlertaCuposBajos(partido);
+        
         logger.info("Partido actualizado exitosamente");
         return convertirADTO(partido);
     }
@@ -142,6 +177,7 @@ public class PartidoService {
         }
         
         actualizarSede(partido, partidoDTO.getSedeId());
+        actualizarCategoria(partido, partidoDTO.getCategoriaId());
         
         if (partidoDTO.getMaxJugadores() != null) {
             partido.setMaxJugadores(partidoDTO.getMaxJugadores());
@@ -162,6 +198,16 @@ public class PartidoService {
         } else if (sedeId == null && partido.getSede() != null) {
             // Si se envía null explícitamente, remover la sede
             partido.setSede(null);
+        }
+    }
+
+    private void actualizarCategoria(Partido partido, Long categoriaId) {
+        if (categoriaId != null) {
+            Categoria categoria = categoriaService.obtenerCategoriaEntity(categoriaId);
+            partido.setCategoria(categoria);
+        } else if (categoriaId == null && partido.getCategoria() != null) {
+            // Si se envía null explícitamente, remover la categoría
+            partido.setCategoria(null);
         }
     }
 
@@ -238,6 +284,7 @@ public class PartidoService {
             agregarFiltrosJugadores(predicates, busqueda, root, cb);
             agregarFiltroCuposDisponibles(predicates, busqueda, root, cb);
             agregarFiltroSoloDisponibles(predicates, busqueda, root, cb);
+            agregarFiltroCategoria(predicates, busqueda, root, cb);
             aplicarOrdenamiento(query, root, cb);
 
             return cb.and(predicates.toArray(new Predicate[0]));
@@ -311,6 +358,12 @@ public class PartidoService {
             predicates.add(cb.equal(root.get("estado"), EstadoPartido.DISPONIBLE));
         }
     }
+
+    private void agregarFiltroCategoria(List<Predicate> predicates, BusquedaPartidoDTO busqueda, Root<Partido> root, CriteriaBuilder cb) {
+        if (busqueda.getCategoriaId() != null) {
+            predicates.add(cb.equal(root.get("categoria").get("id"), busqueda.getCategoriaId()));
+        }
+    }
     
     private void aplicarOrdenamiento(CriteriaQuery<?> query, Root<Partido> root, CriteriaBuilder cb) {
         if (query != null) {
@@ -327,7 +380,10 @@ public class PartidoService {
     private PartidoResponseDTO convertirADTO(Partido partido) {
         PartidoResponseDTO dto = mapearCamposBasicos(partido);
         asignarSedeADTO(dto, partido);
+        asignarCategoriaADTO(dto, partido);
         asignarParticipantesADTO(dto, partido);
+        asignarPromedioCalificacion(dto, partido);
+        asignarEquiposADTO(dto, partido);
         return dto;
     }
     
@@ -352,6 +408,51 @@ public class PartidoService {
         if (partido.getSede() != null) {
             dto.setSedeId(partido.getSede().getId());
             dto.setSede(convertirSedeADTO(partido.getSede()));
+        }
+    }
+
+    private void asignarCategoriaADTO(PartidoResponseDTO dto, Partido partido) {
+        if (partido.getCategoria() != null) {
+            dto.setCategoriaId(partido.getCategoria().getId());
+            dto.setCategoria(convertirCategoriaADTO(partido.getCategoria()));
+        }
+    }
+
+    private CategoriaResponseDTO convertirCategoriaADTO(Categoria categoria) {
+        CategoriaResponseDTO categoriaDTO = new CategoriaResponseDTO();
+        categoriaDTO.setId(categoria.getId());
+        categoriaDTO.setNombre(categoria.getNombre());
+        categoriaDTO.setDescripcion(categoria.getDescripcion());
+        categoriaDTO.setIcono(categoria.getIcono());
+        categoriaDTO.setColor(categoria.getColor());
+        categoriaDTO.setFechaCreacion(categoria.getFechaCreacion());
+        categoriaDTO.setFechaActualizacion(categoria.getFechaActualizacion());
+        return categoriaDTO;
+    }
+
+    private void asignarPromedioCalificacion(PartidoResponseDTO dto, Partido partido) {
+        try {
+            @SuppressWarnings("null")
+            Long partidoId = partido.getId();
+            Double promedio = calificacionService.obtenerPromedioPorPartido(partidoId);
+            dto.setPromedioCalificacion(promedio > 0 ? promedio : null);
+        } catch (Exception e) {
+            logger.debug("No se pudo obtener el promedio de calificaciones para el partido {}: {}", 
+                    partido.getId(), e.getMessage());
+            dto.setPromedioCalificacion(null);
+        }
+    }
+
+    private void asignarEquiposADTO(PartidoResponseDTO dto, Partido partido) {
+        try {
+            @SuppressWarnings("null")
+            Long partidoId = partido.getId();
+            List<EquipoResponseDTO> equipos = equipoService.obtenerEquiposPorPartido(partidoId);
+            dto.setEquipos(equipos);
+        } catch (Exception e) {
+            logger.debug("No se pudieron obtener los equipos para el partido {}: {}", 
+                    partido.getId(), e.getMessage());
+            dto.setEquipos(new ArrayList<>());
         }
     }
     

@@ -48,6 +48,9 @@ class ReservaServiceTest {
     @Mock
     private MapperUtil mapperUtil;
 
+    @Mock
+    private AlertaService alertaService;
+
     @InjectMocks
     private ReservaService reservaService;
 

@@ -21,6 +21,10 @@ public class PartidoResponseDTO {
     private List<ParticipanteResponseDTO> participantes;
     private Double precio;
     private String imagenUrl;
+    private Long categoriaId;
+    private CategoriaResponseDTO categoria;
+    private Double promedioCalificacion;
+    private List<EquipoResponseDTO> equipos;
 
     // Getters y Setters
     public Long getId() {
@@ -141,6 +145,38 @@ public class PartidoResponseDTO {
 
     public void setImagenUrl(String imagenUrl) {
         this.imagenUrl = imagenUrl;
+    }
+
+    public Long getCategoriaId() {
+        return categoriaId;
+    }
+
+    public void setCategoriaId(Long categoriaId) {
+        this.categoriaId = categoriaId;
+    }
+
+    public CategoriaResponseDTO getCategoria() {
+        return categoria;
+    }
+
+    public void setCategoria(CategoriaResponseDTO categoria) {
+        this.categoria = categoria;
+    }
+
+    public Double getPromedioCalificacion() {
+        return promedioCalificacion;
+    }
+
+    public void setPromedioCalificacion(Double promedioCalificacion) {
+        this.promedioCalificacion = promedioCalificacion;
+    }
+
+    public List<EquipoResponseDTO> getEquipos() {
+        return equipos;
+    }
+
+    public void setEquipos(List<EquipoResponseDTO> equipos) {
+        this.equipos = equipos;
     }
 }
 

@@ -33,6 +33,18 @@ class PartidoServiceTest {
     @Mock
     private SedeRepository sedeRepository;
 
+    @Mock
+    private CategoriaService categoriaService;
+
+    @Mock
+    private AlertaService alertaService;
+
+    @Mock
+    private CalificacionService calificacionService;
+
+    @Mock
+    private EquipoService equipoService;
+
     @InjectMocks
     private PartidoService partidoService;
 

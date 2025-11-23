@@ -1,11 +1,17 @@
 package com.techlab.picadito.controller;
 
+import com.techlab.picadito.dto.EstadisticasDTO;
 import com.techlab.picadito.dto.PartidoResponseDTO;
+import com.techlab.picadito.dto.ReporteDTO;
 import com.techlab.picadito.service.AdminService;
+import com.techlab.picadito.service.EstadisticasService;
+import com.techlab.picadito.service.ReporteService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -15,6 +21,8 @@ import java.util.List;
 public class AdminController {
     
     private final AdminService adminService;
+    private final EstadisticasService estadisticasService;
+    private final ReporteService reporteService;
     
     /**
      * Obtiene partidos con capacidad disponible baja (equivalente a stock bajo)
@@ -27,6 +35,59 @@ public class AdminController {
             @RequestParam(required = false) Integer capacidadMinima) {
         List<PartidoResponseDTO> partidos = adminService.obtenerPartidosConCapacidadBaja(capacidadMinima);
         return ResponseEntity.ok(partidos);
+    }
+
+    /**
+     * Obtiene estadísticas generales del sistema
+     */
+    @GetMapping("/estadisticas")
+    public ResponseEntity<EstadisticasDTO> obtenerEstadisticas() {
+        EstadisticasDTO estadisticas = estadisticasService.obtenerEstadisticasGenerales();
+        return ResponseEntity.ok(estadisticas);
+    }
+
+    /**
+     * Obtiene estadísticas para un período específico
+     */
+    @GetMapping("/estadisticas/periodo")
+    public ResponseEntity<EstadisticasDTO> obtenerEstadisticasPorPeriodo(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaInicio,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaFin) {
+        EstadisticasDTO estadisticas = estadisticasService.obtenerEstadisticasPorPeriodo(fechaInicio, fechaFin);
+        return ResponseEntity.ok(estadisticas);
+    }
+
+    /**
+     * Genera reporte de ventas para un período específico
+     */
+    @GetMapping("/reportes/ventas")
+    public ResponseEntity<ReporteDTO> generarReporteVentas(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaInicio,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaFin) {
+        ReporteDTO reporte = reporteService.generarReporteVentas(fechaInicio, fechaFin);
+        return ResponseEntity.ok(reporte);
+    }
+
+    /**
+     * Genera reporte de partidos para un período específico
+     */
+    @GetMapping("/reportes/partidos")
+    public ResponseEntity<ReporteDTO> generarReportePartidos(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaInicio,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaFin) {
+        ReporteDTO reporte = reporteService.generarReportePartidos(fechaInicio, fechaFin);
+        return ResponseEntity.ok(reporte);
+    }
+
+    /**
+     * Genera reporte de usuarios para un período específico
+     */
+    @GetMapping("/reportes/usuarios")
+    public ResponseEntity<ReporteDTO> generarReporteUsuarios(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaInicio,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaFin) {
+        ReporteDTO reporte = reporteService.generarReporteUsuarios(fechaInicio, fechaFin);
+        return ResponseEntity.ok(reporte);
     }
 }
 

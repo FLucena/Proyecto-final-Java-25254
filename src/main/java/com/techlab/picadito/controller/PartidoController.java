@@ -93,5 +93,19 @@ public class PartidoController {
         List<PartidoResponseDTO> partidos = partidoService.buscarPartidos(busqueda);
         return ResponseEntity.ok(partidos);
     }
+
+    @GetMapping("/categoria/{categoriaId}")
+    public ResponseEntity<List<PartidoResponseDTO>> obtenerPartidosPorCategoria(
+            @PathVariable String categoriaId) {
+        try {
+            Long idLong = Long.parseLong(categoriaId);
+            BusquedaPartidoDTO busqueda = new BusquedaPartidoDTO();
+            busqueda.setCategoriaId(idLong);
+            List<PartidoResponseDTO> partidos = partidoService.buscarPartidos(busqueda);
+            return ResponseEntity.ok(partidos);
+        } catch (NumberFormatException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
 }
 
