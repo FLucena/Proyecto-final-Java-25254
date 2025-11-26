@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,7 +39,8 @@ public class CalificacionService {
         logger.info("Creando calificación del usuario {} para el partido {}", usuarioId, calificacionDTO.getPartidoId());
         
         Usuario usuario = usuarioService.obtenerUsuarioEntity(usuarioId);
-        Partido partido = partidoService.obtenerPartidoEntity(calificacionDTO.getPartidoId());
+        Long partidoId = Objects.requireNonNull(calificacionDTO.getPartidoId(), "El ID del partido no puede ser null");
+        Partido partido = partidoService.obtenerPartidoEntity(partidoId);
         
         // Validar que el partido haya finalizado
         if (partido.getEstado() != EstadoPartido.FINALIZADO) {
@@ -46,8 +48,6 @@ public class CalificacionService {
         }
         
         // Validar que el usuario no haya calificado este partido antes
-        @SuppressWarnings("null")
-        Long partidoId = calificacionDTO.getPartidoId();
         if (calificacionRepository.existsByUsuarioIdAndPartidoId(usuarioId, partidoId)) {
             throw new BusinessException("Ya has calificado este partido");
         }

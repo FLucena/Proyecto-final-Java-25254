@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -432,8 +433,7 @@ public class PartidoService {
 
     private void asignarPromedioCalificacion(PartidoResponseDTO dto, Partido partido) {
         try {
-            @SuppressWarnings("null")
-            Long partidoId = partido.getId();
+            Long partidoId = Objects.requireNonNull(partido.getId(), "El partido debe tener un ID");
             Double promedio = calificacionService.obtenerPromedioPorPartido(partidoId);
             dto.setPromedioCalificacion(promedio > 0 ? promedio : null);
         } catch (Exception e) {
@@ -445,8 +445,7 @@ public class PartidoService {
 
     private void asignarEquiposADTO(PartidoResponseDTO dto, Partido partido) {
         try {
-            @SuppressWarnings("null")
-            Long partidoId = partido.getId();
+            Long partidoId = Objects.requireNonNull(partido.getId(), "El partido debe tener un ID");
             List<EquipoResponseDTO> equipos = equipoService.obtenerEquiposPorPartido(partidoId);
             dto.setEquipos(equipos);
         } catch (Exception e) {

@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -64,7 +65,8 @@ public class AlertaService {
         }
 
         if (alertaDTO.getPartidoId() != null) {
-            Partido partido = partidoService.obtenerPartidoEntity(alertaDTO.getPartidoId());
+            Long partidoId = Objects.requireNonNull(alertaDTO.getPartidoId(), "Partido ID no puede ser null");
+            Partido partido = partidoService.obtenerPartidoEntity(partidoId);
             alerta.setPartido(partido);
         }
 
@@ -80,8 +82,7 @@ public class AlertaService {
             alertaDTO.setTipo(TipoAlerta.CUPOS_BAJOS);
             alertaDTO.setMensaje(String.format("El partido '%s' tiene solo %d cupos disponibles", 
                     partido.getTitulo(), cuposDisponibles));
-            @SuppressWarnings("null")
-            Long partidoId = partido.getId();
+            Long partidoId = Objects.requireNonNull(partido.getId(), "El partido debe tener un ID");
             alertaDTO.setPartidoId(partidoId);
             crear(alertaDTO);
         }
@@ -131,10 +132,13 @@ public class AlertaService {
     public void eliminarAlertasAntiguas(int diasAntiguedad) {
         logger.info("Eliminando alertas más antiguas de {} días", diasAntiguedad);
         java.time.LocalDateTime fechaLimite = java.time.LocalDateTime.now().minusDays(diasAntiguedad);
-        @SuppressWarnings("null")
         List<Alerta> alertasAntiguas = alertaRepository.findAlertasAntiguas(fechaLimite);
-        alertaRepository.deleteAll(alertasAntiguas);
-        logger.info("Se eliminaron {} alertas antiguas", alertasAntiguas.size());
+        if (alertasAntiguas != null && !alertasAntiguas.isEmpty()) {
+            alertaRepository.deleteAll(alertasAntiguas);
+            logger.info("Se eliminaron {} alertas antiguas", alertasAntiguas.size());
+        } else {
+            logger.info("No se encontraron alertas antiguas para eliminar");
+        }
     }
 
     private AlertaResponseDTO convertirADTO(Alerta alerta) {

@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,9 +42,8 @@ public class EquipoService {
         }
 
         // Eliminar equipos existentes si los hay
-        @SuppressWarnings("null")
         List<Equipo> equiposExistentes = equipoRepository.findByPartidoId(partidoId);
-        if (!equiposExistentes.isEmpty()) {
+        if (equiposExistentes != null && !equiposExistentes.isEmpty()) {
             equipoRepository.deleteAll(equiposExistentes);
         }
 
@@ -52,13 +52,11 @@ public class EquipoService {
         // Dividir en 2 equipos balanceados
         List<List<Participante>> equiposBalanceados = balancearEquipos(participantes);
         
-        @SuppressWarnings("null")
-        Equipo equipo1 = crearEquipo(partido, "Equipo A", equiposBalanceados.get(0));
-        @SuppressWarnings("null")
-        Equipo equipo2 = crearEquipo(partido, "Equipo B", equiposBalanceados.get(1));
+        Equipo equipo1 = Objects.requireNonNull(crearEquipo(partido, "Equipo A", equiposBalanceados.get(0)), "Error al crear equipo1");
+        Equipo equipo2 = Objects.requireNonNull(crearEquipo(partido, "Equipo B", equiposBalanceados.get(1)), "Error al crear equipo2");
         
-        equipo1 = equipoRepository.save(equipo1);
-        equipo2 = equipoRepository.save(equipo2);
+        equipo1 = Objects.requireNonNull(equipoRepository.save(equipo1), "Error al guardar equipo1");
+        equipo2 = Objects.requireNonNull(equipoRepository.save(equipo2), "Error al guardar equipo2");
         
         logger.info("Equipos generados exitosamente. Equipo 1: {} participantes, Equipo 2: {} participantes",
                 equipo1.getCantidadParticipantes(), equipo2.getCantidadParticipantes());
@@ -83,8 +81,12 @@ public class EquipoService {
     public void eliminarEquipos(@NonNull Long partidoId) {
         logger.info("Eliminando equipos del partido {}", partidoId);
         List<Equipo> equipos = equipoRepository.findByPartidoId(partidoId);
-        equipoRepository.deleteAll(equipos);
-        logger.info("Equipos eliminados exitosamente");
+        if (equipos != null && !equipos.isEmpty()) {
+            equipoRepository.deleteAll(equipos);
+            logger.info("Equipos eliminados exitosamente");
+        } else {
+            logger.info("No se encontraron equipos para eliminar");
+        }
     }
 
     private List<List<Participante>> balancearEquipos(List<Participante> participantes) {
