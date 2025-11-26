@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "partidos")
@@ -41,7 +43,7 @@ public class Partido {
         joinColumns = @JoinColumn(name = "partido_id"),
         inverseJoinColumns = @JoinColumn(name = "categoria_id")
     )
-    private List<Categoria> categorias = new ArrayList<>();
+    private Set<Categoria> categorias = new HashSet<>();
 
     @NotNull(message = "El número máximo de jugadores es requerido")
     @Min(value = 1, message = "El número máximo de jugadores debe ser al menos 1")
@@ -207,12 +209,12 @@ public class Partido {
         this.imagenUrl = imagenUrl;
     }
 
-    public List<Categoria> getCategorias() {
+    public Set<Categoria> getCategorias() {
         return categorias;
     }
 
-    public void setCategorias(List<Categoria> categorias) {
-        this.categorias = categorias != null ? categorias : new ArrayList<>();
+    public void setCategorias(Set<Categoria> categorias) {
+        this.categorias = categorias != null ? categorias : new HashSet<>();
     }
 
     public List<Equipo> getEquipos() {

@@ -31,11 +31,12 @@ API REST desarrollada con Spring Boot para gestionar partidos de fútbol. Permit
 - ✅ **Validaciones de Negocio**: Estado del partido, capacidad máxima, fechas futuras, validación de partidos completos
 - ✅ **Manejo Centralizado de Excepciones**: Errores consistentes y claros
 - ✅ **Bloqueo Optimista**: Previene race conditions en inscripciones
-- ✅ **Sistema de Categorías**: Clasificar partidos por categorías (Fútbol 11, Fútbol 7, Mixto, etc.)
+- ✅ **Sistema de Categorías**: Clasificar partidos por múltiples categorías (Many-to-Many) - Un partido puede tener varias categorías (Fútbol 11, Fútbol 7, Mixto, etc.)
 - ✅ **Sistema de Alertas/Notificaciones**: Alertas automáticas para cupos bajos, partidos próximos y confirmaciones
 - ✅ **Sistema de Estadísticas y Reportes**: Dashboard administrativo con métricas y reportes detallados
 - ✅ **Sistema de Calificaciones**: Los usuarios pueden calificar partidos después de jugarlos
 - ✅ **Sistema de Equipos Automáticos**: Generación automática de equipos balanceados por posición y nivel
+- ✅ **Normalización de Jugadores**: Los partidos aleatorios se normalizan automáticamente a un número par de jugadores entre 10 y 22
 
 ## 🔧 Tecnologías Utilizadas
 
@@ -78,7 +79,7 @@ mvn spring-boot:run
 
 - Espera a ver el mensaje: `Started PicaditoApplication`
 - El backend estará disponible en: `http://localhost:8080`
-- **H2 Console**: `http://localhost:8080/h2-console`
+- **H2 Console** (solo en perfil `dev`): `http://localhost:8080/h2-console`
   - JDBC URL: `jdbc:h2:mem:testdb`
   - Usuario: `sa`
   - Password: (vacío)
@@ -179,7 +180,7 @@ El proyecto sigue una **arquitectura en capas** (Layered Architecture) con separ
 
 - `GET /api/partidos` - Listar todos los partidos
 - `GET /api/partidos/disponibles` - Listar partidos disponibles
-- `POST /api/partidos/buscar` - Búsqueda avanzada
+- `POST /api/partidos/buscar` - Búsqueda avanzada (soporta múltiples categorías mediante `categoriaIds`)
 - `GET /api/partidos/{id}` - Obtener partido por ID
 - `POST /api/partidos` - Crear nuevo partido
 - `PUT /api/partidos/{id}` - Actualizar partido
@@ -287,8 +288,8 @@ El proyecto sigue una **arquitectura en capas** (Layered Architecture) con separ
 - `cantidadParticipantes`: Cantidad actual de participantes
 - `precio`: Precio total del partido (opcional)
 - `imagenUrl`: URL de imagen del partido (opcional, máx. 500 caracteres)
-- `categoriaId`: ID de la categoría del partido (opcional)
-- `categoria`: Objeto Categoria completo (incluido en respuesta)
+- `categoriaIds`: Lista de IDs de categorías del partido (opcional, Many-to-Many)
+- `categorias`: Lista de objetos Categoria completos (incluido en respuesta)
 - `promedioCalificacion`: Promedio de calificaciones del partido (opcional)
 - `equipos`: Lista de equipos generados para el partido (opcional)
 
@@ -356,6 +357,7 @@ El proyecto sigue una **arquitectura en capas** (Layered Architecture) con separ
 - El título, ubicación y nombre del creador son obligatorios
 - **La fecha y hora (`fechaHora`) DEBE ser una fecha futura**
 - El número máximo de jugadores debe estar entre 1 y 50
+- **Partidos Aleatorios**: El número de jugadores se normaliza automáticamente a un valor par entre 10 y 22 (inclusive)
 - No se puede actualizar un partido finalizado o cancelado
 - No se puede reducir el máximo de jugadores por debajo de la cantidad actual de participantes
 
@@ -401,8 +403,9 @@ El proyecto sigue una **arquitectura en capas** (Layered Architecture) con separ
 ### Categorías
 - Las categorías permiten clasificar partidos (Fútbol 11, Fútbol 7, Mixto, etc.)
 - Cada categoría puede tener nombre, descripción, icono y color
-- Los partidos pueden estar asociados a una categoría mediante `categoriaId`
-- Se pueden filtrar partidos por categoría en la búsqueda avanzada
+- **Relación Many-to-Many**: Un partido puede tener múltiples categorías mediante `categoriaIds` (lista)
+- Se pueden filtrar partidos por una o más categorías en la búsqueda avanzada
+- La relación se almacena en la tabla intermedia `partido_categorias`
 
 ### Alertas
 - Las alertas se generan automáticamente cuando:
@@ -453,6 +456,38 @@ Ejemplo de respuesta de error:
   "error": "Business Error",
   "message": "El partido ya está completo. Máximo de jugadores: 22",
   "path": "/api/partidos/1/participantes"
+}
+```
+
+### Ejemplos de Uso
+
+#### Crear un partido con múltiples categorías
+
+```json
+POST /api/partidos
+Content-Type: application/json
+
+{
+  "titulo": "Partido Mixto Fútbol 7",
+  "descripcion": "Partido mixto de fútbol 7",
+  "fechaHora": "2024-12-15T18:00:00",
+  "maxJugadores": 14,
+  "creadorNombre": "Juan Pérez",
+  "categoriaIds": [3, 4],  // Fútbol 7 y Mixto
+  "precio": 5000.0
+}
+```
+
+#### Buscar partidos por múltiples categorías
+
+```json
+POST /api/partidos/buscar
+Content-Type: application/json
+
+{
+  "categoriaIds": [1, 2],  // Fútbol 11 o Fútbol 7
+  "soloDisponibles": true,
+  "fechaDesde": "2024-12-01T00:00:00"
 }
 ```
 
@@ -527,49 +562,125 @@ Configurado para permitir orígenes específicos:
 
 El proyecto utiliza **Spring Profiles** para configurar diferentes bases de datos según el entorno:
 
-#### Perfil de Desarrollo (`dev`) - Por Defecto
+#### Perfil de Desarrollo (`dev`) - H2 Database
+
+**Configuración**: `src/main/resources/application-dev.properties`
+
+**Características**:
 - **Motor**: H2 Database (en memoria)
 - **Consola H2**: `http://localhost:8080/h2-console`
   - JDBC URL: `jdbc:h2:mem:testdb`
   - Usuario: `sa`
   - Password: (vacío)
 - **⚠️ Nota**: Los datos se pierden al reiniciar la aplicación
+- **SQL visible**: Las consultas SQL se muestran en la consola (útil para debugging)
 
-#### Perfil de Producción (`prod`) - MySQL
-- **Motor**: MySQL Database
-- **Configuración**: `src/main/resources/application-prod.properties`
-- **Setup inicial**:
-  1. Copia `application-prod.properties.example` a `application-prod.properties`
-  2. Actualiza las credenciales de MySQL en `application-prod.properties`
-  3. Crea la base de datos: `CREATE DATABASE picadito_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
-  4. Activa el perfil `prod` en `application.properties` o en tu IDE
+**Ejecutar con H2**:
+```bash
+# Opción 1: Modificar application.properties
+# Cambiar: spring.profiles.active=dev
 
-#### Cambiar entre Perfiles
+# Opción 2: Variable de entorno
+# Windows PowerShell
+$env:SPRING_PROFILES_ACTIVE="dev"
+.\mvnw.cmd spring-boot:run
 
-**Opción 1: Modificar `application.properties`**
-```properties
-spring.profiles.active=prod  # Para MySQL
-spring.profiles.active=dev   # Para H2 (por defecto)
+# Linux/Mac
+export SPRING_PROFILES_ACTIVE=dev
+./mvnw spring-boot:run
+
+# Opción 3: Argumento de línea de comandos
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-**Opción 2: Variable de entorno**
+#### Perfil de Producción (`prod`) - MySQL Database
+
+**Configuración**: `src/main/resources/application-prod.properties`
+
+**Setup inicial**:
+1. Copia `application-prod.properties.example` a `application-prod.properties`
+   ```bash
+   # Windows
+   copy src\main\resources\application-prod.properties.example src\main\resources\application-prod.properties
+   
+   # Linux/Mac
+   cp src/main/resources/application-prod.properties.example src/main/resources/application-prod.properties
+   ```
+
+2. Edita `application-prod.properties` y actualiza las credenciales:
+   ```properties
+   spring.datasource.username=root
+   spring.datasource.password=TU_PASSWORD_AQUI
+   ```
+
+3. Crea la base de datos en MySQL:
+   ```sql
+   CREATE DATABASE picadito_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   ```
+
+4. Activa el perfil `prod` (ver sección "Cambiar entre Perfiles" abajo)
+
+**Ejecutar con MySQL**:
 ```bash
+# Opción 1: Modificar application.properties
+# Cambiar: spring.profiles.active=prod
+
+# Opción 2: Variable de entorno
 # Windows PowerShell
 $env:SPRING_PROFILES_ACTIVE="prod"
+.\mvnw.cmd spring-boot:run
 
 # Linux/Mac
 export SPRING_PROFILES_ACTIVE=prod
-```
+./mvnw spring-boot:run
 
-**Opción 3: Argumento de línea de comandos**
-```bash
+# Opción 3: Argumento de línea de comandos
 .\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=prod
 ```
 
+#### Cambiar entre Perfiles
+
+**Opción 1: Modificar `application.properties`** (Recomendado para desarrollo)
+```properties
+# Para H2 (desarrollo)
+spring.profiles.active=dev
+
+# Para MySQL (producción)
+spring.profiles.active=prod
+```
+
+**Opción 2: Variable de entorno** (Útil para diferentes entornos)
+```bash
+# Windows PowerShell
+$env:SPRING_PROFILES_ACTIVE="dev"   # Para H2
+$env:SPRING_PROFILES_ACTIVE="prod"  # Para MySQL
+.\mvnw.cmd spring-boot:run
+
+# Linux/Mac
+export SPRING_PROFILES_ACTIVE=dev   # Para H2
+export SPRING_PROFILES_ACTIVE=prod  # Para MySQL
+./mvnw spring-boot:run
+```
+
+**Opción 3: Argumento de línea de comandos** (Útil para pruebas rápidas)
+```bash
+# Windows
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev   # H2
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=prod  # MySQL
+
+# Linux/Mac
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev   # H2
+./mvnw spring-boot:run -Dspring-boot.run.profiles=prod  # MySQL
+```
+
 **Opción 4: En tu IDE**
-- **IntelliJ IDEA**: Run → Edit Configurations → Active profiles: `prod`
-- **Eclipse**: Run → Run Configurations → Arguments → `--spring.profiles.active=prod`
-- **VS Code**: `.vscode/launch.json` → `"vmArgs": "-Dspring.profiles.active=prod"`
+- **IntelliJ IDEA**: 
+  - Run → Edit Configurations → Active profiles: `dev` o `prod`
+  - O en VM options: `-Dspring.profiles.active=prod`
+- **Eclipse**: 
+  - Run → Run Configurations → Arguments → `--spring.profiles.active=prod`
+- **VS Code**: 
+  - `.vscode/launch.json` → `"vmArgs": "-Dspring.profiles.active=prod"`
 
 #### Seguridad: Archivos de Configuración
 
@@ -621,11 +732,25 @@ mvn spring-boot:run
 - La base de datos H2 se crea automáticamente en memoria
 
 **MySQL (Producción)**:
-- Verifica que MySQL esté corriendo: `netstat -ano | findstr :3306` (Windows) o `lsof -ti:3306` (Linux/Mac)
-- Confirma que el perfil `prod` esté activo en `application.properties`
-- Verifica las credenciales en `application-prod.properties`
-- Asegúrate de que la base de datos `picadito_db` existe
-- Prueba la conexión ejecutando `MySQLConnectionTest.java` en el paquete `com.techlab.picadito.util`
+- Verifica que MySQL esté corriendo:
+  ```bash
+  # Windows
+  netstat -ano | findstr :3306
+  
+  # Linux/Mac
+  lsof -ti:3306
+  ```
+- Confirma que el perfil `prod` esté activo en `application.properties` o mediante variable de entorno
+- Verifica las credenciales en `application-prod.properties` (debe existir, no el `.example`)
+- Asegúrate de que la base de datos `picadito_db` existe:
+  ```sql
+  CREATE DATABASE IF NOT EXISTS picadito_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+  ```
+- Verifica que el usuario de MySQL tenga permisos:
+  ```sql
+  GRANT ALL PRIVILEGES ON picadito_db.* TO 'root'@'localhost';
+  FLUSH PRIVILEGES;
+  ```
 
 ### Error de CORS
 - Verifica que el origen del frontend esté en `CorsConfig.java`

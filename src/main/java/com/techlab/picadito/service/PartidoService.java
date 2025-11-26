@@ -30,8 +30,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -68,9 +70,17 @@ public class PartidoService {
     }
 
     public List<PartidoResponseDTO> obtenerPartidosDisponibles() {
-        return partidoRepository.findByEstadoOrderByFechaHoraAsc(EstadoPartido.DISPONIBLE).stream()
-                .map(this::convertirADTO)
-                .collect(Collectors.toList());
+        try {
+            logger.debug("Obteniendo partidos disponibles");
+            List<Partido> partidos = partidoRepository.findByEstadoOrderByFechaHoraAsc(EstadoPartido.DISPONIBLE);
+            logger.debug("Se encontraron {} partidos disponibles", partidos.size());
+            return partidos.stream()
+                    .map(this::convertirADTO)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            logger.error("Error al obtener partidos disponibles", e);
+            throw e;
+        }
     }
 
     public PartidoResponseDTO obtenerPartidoPorId(@NonNull Long id) {
@@ -83,20 +93,41 @@ public class PartidoService {
 
     @SuppressWarnings("null")
     public PartidoResponseDTO crearPartido(PartidoDTO partidoDTO) {
-        logger.info("Creando nuevo partido: {} por {}", partidoDTO.getTitulo(), partidoDTO.getCreadorNombre());
-        validarFechaFutura(partidoDTO.getFechaHora());
+        try {
+            logger.info("Creando nuevo partido: {} por {}", partidoDTO.getTitulo(), partidoDTO.getCreadorNombre());
+            logger.debug("PartidoDTO recibido - categoriaIds: {}", partidoDTO.getCategoriaIds());
+            validarFechaFutura(partidoDTO.getFechaHora());
 
-        Partido partido = crearEntidadPartido(partidoDTO);
-        asignarSedeSiExiste(partido, partidoDTO.getSedeId());
-        asignarCategorias(partido, partidoDTO);
+            Partido partido = crearEntidadPartido(partidoDTO);
+            asignarSedeSiExiste(partido, partidoDTO.getSedeId());
+            asignarCategorias(partido, partidoDTO);
+            
+            logger.debug("Partido antes de guardar - categorias size: {}", 
+                    partido.getCategorias() != null ? partido.getCategorias().size() : 0);
 
-        partido = partidoRepository.save(partido);
-        
-        // Generar alerta si hay cupos bajos
-        alertaService.crearAlertaCuposBajos(partido);
-        
-        logger.info("Partido creado exitosamente con id: {}", partido.getId());
-        return convertirADTO(partido);
+            partido = partidoRepository.save(partido);
+            logger.debug("Partido guardado con id: {}", partido.getId());
+            
+            // Recargar el partido para asegurar que las relaciones estén cargadas
+            partido = partidoRepository.findById(partido.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Partido no encontrado después de guardar"));
+            logger.debug("Partido recargado - categorias size: {}", 
+                    partido.getCategorias() != null ? partido.getCategorias().size() : 0);
+            
+            // Generar alerta si hay cupos bajos
+            try {
+                alertaService.crearAlertaCuposBajos(partido);
+            } catch (Exception e) {
+                logger.warn("No se pudo crear alerta de cupos bajos para partido {}: {}", 
+                        partido.getId(), e.getMessage());
+            }
+            
+            logger.info("Partido creado exitosamente con id: {}", partido.getId());
+            return convertirADTO(partido);
+        } catch (Exception e) {
+            logger.error("Error al crear partido: {}", e.getMessage(), e);
+            throw e;
+        }
     }
     
     private Partido crearEntidadPartido(PartidoDTO partidoDTO) {
@@ -105,12 +136,41 @@ public class PartidoService {
         partido.setDescripcion(partidoDTO.getDescripcion());
         partido.setFechaHora(partidoDTO.getFechaHora());
         partido.setUbicacion(partidoDTO.getUbicacion());
-        partido.setMaxJugadores(partidoDTO.getMaxJugadores());
+        partido.setMaxJugadores(normalizarMaxJugadores(partidoDTO.getMaxJugadores()));
         partido.setCreadorNombre(partidoDTO.getCreadorNombre());
         partido.setPrecio(partidoDTO.getPrecio());
         partido.setImagenUrl(partidoDTO.getImagenUrl());
         partido.setEstado(EstadoPartido.DISPONIBLE);
         return partido;
+    }
+    
+    /**
+     * Normaliza el número máximo de jugadores para partidos aleatorios:
+     * - Debe estar entre 10 y 22 (inclusive)
+     * - Debe ser un número par
+     * 
+     * @param maxJugadores Número de jugadores a normalizar
+     * @return Número normalizado (par entre 10 y 22)
+     */
+    private Integer normalizarMaxJugadores(Integer maxJugadores) {
+        if (maxJugadores == null) {
+            return 22; // Valor por defecto
+        }
+        
+        // Asegurar que esté en el rango 10-22
+        int normalizado = Math.max(10, Math.min(22, maxJugadores));
+        
+        // Asegurar que sea par
+        if (normalizado % 2 != 0) {
+            // Si es impar, redondear hacia abajo al par más cercano
+            normalizado = normalizado - 1;
+            // Si al restar 1 queda fuera del rango mínimo, usar el mínimo par
+            if (normalizado < 10) {
+                normalizado = 10;
+            }
+        }
+        
+        return normalizado;
     }
     
     private void asignarSedeSiExiste(Partido partido, Long sedeId) {
@@ -122,14 +182,35 @@ public class PartidoService {
     }
 
     private void asignarCategorias(Partido partido, PartidoDTO partidoDTO) {
-        List<Long> categoriaIds = partidoDTO.getCategoriaIds();
-        if (categoriaIds != null && !categoriaIds.isEmpty()) {
-            List<Categoria> categorias = categoriaIds.stream()
-                    .map(categoriaService::obtenerCategoriaEntity)
-                    .collect(Collectors.toList());
-            partido.setCategorias(categorias);
-        } else {
-            partido.setCategorias(new ArrayList<>());
+        try {
+            List<Long> categoriaIds = partidoDTO.getCategoriaIds();
+            logger.debug("Asignando categorías - categoriaIds recibidos: {}", categoriaIds);
+            
+            if (categoriaIds != null && !categoriaIds.isEmpty()) {
+                Set<Categoria> categorias = new HashSet<>();
+                for (Long categoriaId : categoriaIds) {
+                    if (categoriaId == null) {
+                        logger.warn("Se encontró un categoriaId null, omitiendo");
+                        continue;
+                    }
+                    try {
+                        Categoria categoria = categoriaService.obtenerCategoriaEntity(categoriaId);
+                        categorias.add(categoria);
+                        logger.debug("Categoría {} agregada al partido", categoriaId);
+                    } catch (Exception e) {
+                        logger.error("Error al obtener categoría con id {}: {}", categoriaId, e.getMessage());
+                        throw new ResourceNotFoundException("Categoría no encontrada con id: " + categoriaId);
+                    }
+                }
+                partido.setCategorias(categorias);
+                logger.debug("{} categorías asignadas al partido", categorias.size());
+            } else {
+                partido.setCategorias(new HashSet<>());
+                logger.debug("No se asignaron categorías (lista vacía o null)");
+            }
+        } catch (Exception e) {
+            logger.error("Error al asignar categorías: {}", e.getMessage(), e);
+            throw e;
         }
     }
 
@@ -187,7 +268,7 @@ public class PartidoService {
         actualizarCategorias(partido, partidoDTO);
         
         if (partidoDTO.getMaxJugadores() != null) {
-            partido.setMaxJugadores(partidoDTO.getMaxJugadores());
+            partido.setMaxJugadores(normalizarMaxJugadores(partidoDTO.getMaxJugadores()));
         }
         if (partidoDTO.getPrecio() != null) {
             partido.setPrecio(partidoDTO.getPrecio());
@@ -211,11 +292,15 @@ public class PartidoService {
     private void actualizarCategorias(Partido partido, PartidoDTO partidoDTO) {
         List<Long> categoriaIds = partidoDTO.getCategoriaIds();
         if (categoriaIds == null || categoriaIds.isEmpty()) {
-            partido.setCategorias(new ArrayList<>());
+            partido.setCategorias(new HashSet<>());
         } else {
-            List<Categoria> categorias = categoriaIds.stream()
-                    .map(categoriaService::obtenerCategoriaEntity)
-                    .collect(Collectors.toList());
+            Set<Categoria> categorias = new HashSet<>();
+            for (Long categoriaId : categoriaIds) {
+                if (categoriaId != null) {
+                    Categoria categoria = categoriaService.obtenerCategoriaEntity(categoriaId);
+                    categorias.add(categoria);
+                }
+            }
             partido.setCategorias(categorias);
         }
     }
@@ -392,13 +477,18 @@ public class PartidoService {
     }
 
     private PartidoResponseDTO convertirADTO(Partido partido) {
-        PartidoResponseDTO dto = mapearCamposBasicos(partido);
-        asignarSedeADTO(dto, partido);
-        asignarCategoriasADTO(dto, partido);
-        asignarParticipantesADTO(dto, partido);
-        asignarPromedioCalificacion(dto, partido);
-        asignarEquiposADTO(dto, partido);
-        return dto;
+        try {
+            PartidoResponseDTO dto = mapearCamposBasicos(partido);
+            asignarSedeADTO(dto, partido);
+            asignarCategoriasADTO(dto, partido);
+            asignarParticipantesADTO(dto, partido);
+            asignarPromedioCalificacion(dto, partido);
+            asignarEquiposADTO(dto, partido);
+            return dto;
+        } catch (Exception e) {
+            logger.error("Error al convertir partido {} a DTO", partido.getId(), e);
+            throw new RuntimeException("Error al convertir partido a DTO: " + e.getMessage(), e);
+        }
     }
     
     private PartidoResponseDTO mapearCamposBasicos(Partido partido) {
@@ -426,17 +516,28 @@ public class PartidoService {
     }
 
     private void asignarCategoriasADTO(PartidoResponseDTO dto, Partido partido) {
-        if (partido.getCategorias() != null && !partido.getCategorias().isEmpty()) {
-            List<CategoriaResponseDTO> categoriasDTO = partido.getCategorias().stream()
-                    .map(this::convertirCategoriaADTO)
-                    .collect(Collectors.toList());
-            dto.setCategorias(categoriasDTO);
-            
-            List<Long> categoriaIds = partido.getCategorias().stream()
-                    .map(Categoria::getId)
-                    .collect(Collectors.toList());
-            dto.setCategoriaIds(categoriaIds);
-        } else {
+        try {
+            Set<Categoria> categorias = partido.getCategorias();
+            if (categorias != null && !categorias.isEmpty()) {
+                List<CategoriaResponseDTO> categoriasDTO = new ArrayList<>();
+                List<Long> categoriaIds = new ArrayList<>();
+                
+                for (Categoria categoria : categorias) {
+                    if (categoria != null) {
+                        categoriasDTO.add(convertirCategoriaADTO(categoria));
+                        categoriaIds.add(categoria.getId());
+                    }
+                }
+                
+                dto.setCategorias(categoriasDTO);
+                dto.setCategoriaIds(categoriaIds);
+            } else {
+                dto.setCategorias(new ArrayList<>());
+                dto.setCategoriaIds(new ArrayList<>());
+            }
+        } catch (Exception e) {
+            logger.warn("Error al asignar categorías al DTO para partido {}: {}", 
+                    partido.getId(), e.getMessage());
             dto.setCategorias(new ArrayList<>());
             dto.setCategoriaIds(new ArrayList<>());
         }
