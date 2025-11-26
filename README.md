@@ -43,6 +43,7 @@ API REST desarrollada con Spring Boot para gestionar partidos de fútbol. Permit
 - **Spring Data JPA** - Abstracción de acceso a datos
 - **Hibernate** - ORM para mapeo objeto-relacional
 - **H2 Database** - Base de datos en memoria para desarrollo
+- **MySQL** - Base de datos para producción (opcional)
 - **Lombok** - Reducción de boilerplate code
 - **Java 21** - Lenguaje de programación
 - **Maven** - Gestión de dependencias y build
@@ -523,13 +524,71 @@ Configurado para permitir orígenes específicos:
 - `http://localhost:5173`
 
 ### Base de Datos
-- **Motor**: H2 Database (en memoria para desarrollo)
+
+El proyecto utiliza **Spring Profiles** para configurar diferentes bases de datos según el entorno:
+
+#### Perfil de Desarrollo (`dev`) - Por Defecto
+- **Motor**: H2 Database (en memoria)
 - **Consola H2**: `http://localhost:8080/h2-console`
   - JDBC URL: `jdbc:h2:mem:testdb`
   - Usuario: `sa`
   - Password: (vacío)
+- **⚠️ Nota**: Los datos se pierden al reiniciar la aplicación
 
-**⚠️ Nota**: Los datos se pierden al reiniciar la aplicación. Para producción, configurar una base de datos persistente (PostgreSQL, MySQL, etc.)
+#### Perfil de Producción (`prod`) - MySQL
+- **Motor**: MySQL Database
+- **Configuración**: `src/main/resources/application-prod.properties`
+- **Setup inicial**:
+  1. Copia `application-prod.properties.example` a `application-prod.properties`
+  2. Actualiza las credenciales de MySQL en `application-prod.properties`
+  3. Crea la base de datos: `CREATE DATABASE picadito_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
+  4. Activa el perfil `prod` en `application.properties` o en tu IDE
+
+#### Cambiar entre Perfiles
+
+**Opción 1: Modificar `application.properties`**
+```properties
+spring.profiles.active=prod  # Para MySQL
+spring.profiles.active=dev   # Para H2 (por defecto)
+```
+
+**Opción 2: Variable de entorno**
+```bash
+# Windows PowerShell
+$env:SPRING_PROFILES_ACTIVE="prod"
+
+# Linux/Mac
+export SPRING_PROFILES_ACTIVE=prod
+```
+
+**Opción 3: Argumento de línea de comandos**
+```bash
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=prod
+```
+
+**Opción 4: En tu IDE**
+- **IntelliJ IDEA**: Run → Edit Configurations → Active profiles: `prod`
+- **Eclipse**: Run → Run Configurations → Arguments → `--spring.profiles.active=prod`
+- **VS Code**: `.vscode/launch.json` → `"vmArgs": "-Dspring.profiles.active=prod"`
+
+#### Seguridad: Archivos de Configuración
+
+**⚠️ IMPORTANTE**: El archivo `application-prod.properties` contiene credenciales sensibles y está en `.gitignore`. 
+
+Si el archivo ya fue commitado al repositorio, elimínalo del historial de git (pero mantén el archivo local):
+
+```bash
+# Eliminar del índice de git (mantiene el archivo local)
+git rm --cached src/main/resources/application-prod.properties
+
+# Commit el cambio
+git commit -m "Remove application-prod.properties from repository"
+
+# Push al repositorio remoto
+git push
+```
+
+El archivo `application-prod.properties.example` es un template seguro que puede ser commitado.
 
 ## 📝 Datos de Prueba
 
@@ -556,8 +615,17 @@ mvn spring-boot:run
 ```
 
 ### Error de conexión con base de datos
-- Verifica que H2 esté configurado correctamente en `application.properties`
-- Para producción, configura MySQL en `application.properties`
+
+**H2 (Desarrollo)**:
+- Verifica que el perfil `dev` esté activo
+- La base de datos H2 se crea automáticamente en memoria
+
+**MySQL (Producción)**:
+- Verifica que MySQL esté corriendo: `netstat -ano | findstr :3306` (Windows) o `lsof -ti:3306` (Linux/Mac)
+- Confirma que el perfil `prod` esté activo en `application.properties`
+- Verifica las credenciales en `application-prod.properties`
+- Asegúrate de que la base de datos `picadito_db` existe
+- Prueba la conexión ejecutando `MySQLConnectionTest.java` en el paquete `com.techlab.picadito.util`
 
 ### Error de CORS
 - Verifica que el origen del frontend esté en `CorsConfig.java`

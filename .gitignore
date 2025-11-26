@@ -31,3 +31,9 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Application Properties with Sensitive Data ###
+src/main/resources/application-prod.properties
+
+### Maven generated files ###
+classpath.txt
