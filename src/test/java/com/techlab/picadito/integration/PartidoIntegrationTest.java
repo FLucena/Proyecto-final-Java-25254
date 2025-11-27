@@ -37,6 +37,7 @@ class PartidoIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        // Limpiar datos antes de cada test
         partidoRepository.deleteAll();
         
         partidoDTO = new PartidoDTO();

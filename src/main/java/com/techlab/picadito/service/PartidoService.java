@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
@@ -310,8 +311,18 @@ public class PartidoService {
         if (!partidoRepository.existsById(id)) {
             throw new ResourceNotFoundException("Partido no encontrado con id: " + id);
         }
-        partidoRepository.deleteById(id);
-        logger.info("Partido eliminado exitosamente");
+        
+        try {
+            partidoRepository.deleteById(id);
+            logger.info("Partido eliminado exitosamente");
+        } catch (DataIntegrityViolationException e) {
+            logger.warn("No se puede eliminar el partido {} debido a restricciones de integridad referencial: {}", 
+                    id, e.getMessage());
+            throw new BusinessException(
+                "No se puede eliminar el partido. Puede tener participantes inscritos, reservas asociadas, " +
+                "equipos generados, calificaciones, partidos guardados o seleccionados que impiden su eliminación."
+            );
+        }
     }
 
     public void actualizarEstadoSegunParticipantes(Partido partido) {

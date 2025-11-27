@@ -19,6 +19,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -132,6 +133,26 @@ class PartidoControllerTest {
     void eliminarPartido_WithValidId_ShouldReturnNoContent() throws Exception {
         mockMvc.perform(delete("/api/partidos/1"))
                 .andExpect(status().isNoContent());
+
+        verify(partidoService).eliminarPartido(1L);
+    }
+
+    @Test
+    void eliminarPartido_WithInvalidId_ShouldReturnBadRequest() throws Exception {
+        mockMvc.perform(delete("/api/partidos/invalid"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void eliminarPartido_WithBusinessException_ShouldReturnBadRequest() throws Exception {
+        org.mockito.Mockito.doThrow(new com.techlab.picadito.exception.BusinessException("No se puede eliminar el partido"))
+                .when(partidoService).eliminarPartido(1L);
+
+        mockMvc.perform(delete("/api/partidos/1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("No se puede eliminar el partido"));
+
+        verify(partidoService).eliminarPartido(1L);
     }
 }
 

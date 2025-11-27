@@ -2,12 +2,14 @@ package com.techlab.picadito.service;
 
 import com.techlab.picadito.dto.PartidoDTO;
 import com.techlab.picadito.dto.PartidoResponseDTO;
+import com.techlab.picadito.exception.BusinessException;
 import com.techlab.picadito.exception.ResourceNotFoundException;
 import com.techlab.picadito.exception.ValidationException;
 import com.techlab.picadito.model.EstadoPartido;
 import com.techlab.picadito.model.Partido;
 import com.techlab.picadito.repository.PartidoRepository;
 import com.techlab.picadito.repository.SedeRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -150,6 +152,37 @@ class PartidoServiceTest {
 
         partidoService.eliminarPartido(1L);
 
+        verify(partidoRepository, times(1)).existsById(1L);
+        verify(partidoRepository, times(1)).deleteById(1L);
+    }
+
+    @Test
+    void eliminarPartido_WithInvalidId_ShouldThrowException() {
+        when(partidoRepository.existsById(999L)).thenReturn(false);
+
+        assertThrows(ResourceNotFoundException.class, () -> {
+            partidoService.eliminarPartido(999L);
+        });
+
+        verify(partidoRepository, times(1)).existsById(999L);
+        verify(partidoRepository, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void eliminarPartido_WithDataIntegrityViolation_ShouldThrowBusinessException() {
+        when(partidoRepository.existsById(1L)).thenReturn(true);
+        doThrow(new DataIntegrityViolationException("Foreign key constraint violation"))
+                .when(partidoRepository).deleteById(1L);
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            partidoService.eliminarPartido(1L);
+        });
+
+        assertTrue(exception.getMessage().contains("No se puede eliminar el partido"));
+        assertTrue(exception.getMessage().contains("participantes") || 
+                   exception.getMessage().contains("reservas") ||
+                   exception.getMessage().contains("equipos"));
+        
         verify(partidoRepository, times(1)).existsById(1L);
         verify(partidoRepository, times(1)).deleteById(1L);
     }

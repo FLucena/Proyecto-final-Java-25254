@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -121,6 +122,38 @@ public class GlobalExceptionHandler {
                 request.getDescription(false).replace("uri=", "")
         );
         return new ResponseEntity<>(error, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponseDTO> handleDataIntegrityViolationException(
+            DataIntegrityViolationException ex, WebRequest request) {
+        logger.warn("Data integrity violation: {}", ex.getMessage());
+        
+        String message = "No se puede eliminar el recurso debido a restricciones de integridad referencial. ";
+        String rootCauseMessage = "";
+        
+        Throwable rootCause = ex.getRootCause();
+        if (rootCause != null && rootCause.getMessage() != null) {
+            rootCauseMessage = rootCause.getMessage();
+        }
+        
+        // Detectar el tipo de violación basándose en el mensaje
+        String lowerRootCause = rootCauseMessage.toLowerCase();
+        if (lowerRootCause.contains("partido")) {
+            message += "El partido tiene relaciones asociadas (participantes, reservas, equipos, calificaciones, partidos guardados o seleccionados) que impiden su eliminación.";
+        } else if (lowerRootCause.contains("foreign key")) {
+            message += "Existen registros relacionados que impiden la eliminación.";
+        } else {
+            message += "Hay datos relacionados que deben eliminarse primero.";
+        }
+        
+        ErrorResponseDTO error = new ErrorResponseDTO(
+                HttpStatus.BAD_REQUEST.value(),
+                "Data Integrity Error",
+                message,
+                request.getDescription(false).replace("uri=", "")
+        );
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(Exception.class)
